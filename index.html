@@ -1,0 +1,1398 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>クラス席替えアプリ Pro</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700&display=swap" rel="stylesheet">
+    <!-- Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
+    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+    
+    <style>
+        :root {
+            --bg-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --glass-bg: rgba(255, 255, 255, 0.25);
+            --glass-border: rgba(255, 255, 255, 0.18);
+            --text-color: #333;
+            --boy-color: #ffffff;
+            --girl-color: #fff9c4;
+            --accent-color: #ff6b6b;
+            --blackboard-color: #2c3e50;
+            --font-main: 'M PLUS Rounded 1c', sans-serif;
+            --disabled-color: #b0bec5;
+        }
+
+        * { box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; }
+
+        body {
+            height: 100vh; margin: 0; display: flex; justify-content: center; align-items: center;
+            background: var(--bg-gradient); 
+            background-size: cover; background-position: center;
+            font-family: var(--font-main); color: var(--text-color); overflow: hidden;
+            transition: background-image 0.5s ease;
+        }
+
+        .app-container {
+            width: 98%; max-width: 1200px; height: 98vh;
+            background: var(--glass-bg); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+            border-radius: 16px; border: 1px solid var(--glass-border);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+            display: flex; flex-direction: column; position: relative; overflow: hidden;
+        }
+
+        /* Header */
+        header {
+            padding: 8px 15px; display: flex; justify-content: space-between; align-items: center;
+            background: rgba(255, 255, 255, 0.1); flex-shrink: 0;
+        }
+        h1 { margin: 0; font-size: 1.1rem; color: #fff; text-shadow: 0 2px 4px rgba(0,0,0,0.3); }
+        
+        .header-controls { display: flex; gap: 10px; }
+        .header-btn {
+            background: rgba(255, 255, 255, 0.9); border: none; padding: 6px 12px;
+            border-radius: 50px; font-family: var(--font-main); font-weight: bold;
+            color: #555; cursor: pointer; font-size: 0.9rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: transform 0.1s;
+            display: flex; align-items: center; gap: 5px;
+        }
+        .header-btn:active { transform: scale(0.95); }
+        
+        /* Blackboard Area */
+        .blackboard-area {
+            width: 100%; padding: 5px; display: flex; justify-content: center; flex-shrink: 0;
+        }
+        .blackboard {
+            width: 50%; background: #204030; border: 6px solid #a0522d; border-radius: 4px;
+            color: #fff; text-align: center; padding: 2px; font-size: 1rem; font-weight: bold;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3); letter-spacing: 5px;
+        }
+
+        /* Seating Area */
+        .seating-area {
+            flex: 1; padding: 10px; overflow: hidden; display: flex;
+            justify-content: center; align-items: center; min-height: 0; position: relative;
+        }
+        .seat-grid {
+            display: grid; gap: 8px; width: 100%; height: 100%;
+        }
+        
+        /* Seat Styling */
+        .seat {
+            border-radius: 6px; display: flex; justify-content: center; align-items: center;
+            font-weight: bold; 
+            font-size: clamp(0.7rem, 2.5vw, 1.8rem);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.15); transition: transform 0.2s, background-color 0.3s;
+            position: relative; overflow: hidden; text-align: center; 
+            padding: 2px;
+            line-height: 1.1; cursor: grab;
+        }
+        .seat:active { cursor: grabbing; }
+        .seat.boy { background-color: var(--boy-color); border: 2px solid #ddd; color: #333; }
+        .seat.girl { background-color: var(--girl-color); border: 2px solid #f0e68c; color: #554400; }
+        .seat.disabled {
+            background-color: rgba(0, 0, 0, 0.1); border: 2px dashed rgba(255, 255, 255, 0.3);
+            color: rgba(255, 255, 255, 0.5); box-shadow: none; cursor: default;
+        }
+        .seat.disabled::after { content: '✕'; opacity: 0.5; }
+
+        /* 名前表示用のスパン（縮小用） */
+        .seat-name {
+            display: inline-block;
+            white-space: nowrap;
+            transform-origin: center;
+        }
+
+        /* Group Badges */
+        .group-badge {
+            position: absolute;
+            top: 0;
+            left: 0;
+            color: white;
+            font-size: 0.6rem;
+            font-weight: bold;
+            padding: 2px 5px;
+            border-bottom-right-radius: 6px;
+            z-index: 5;
+            box-shadow: 1px 1px 2px rgba(0,0,0,0.2);
+        }
+
+        .preview-group-badge {
+            position: absolute;
+            top: 0;
+            left: 0;
+            background: rgba(0,0,0,0.6);
+            color: white;
+            font-size: 0.6rem;
+            padding: 1px 4px;
+            border-bottom-right-radius: 4px;
+            z-index: 2;
+        }
+
+        .fixed-badge {
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            font-size: 0.8rem;
+            z-index: 5;
+            filter: drop-shadow(1px 1px 1px rgba(0,0,0,0.3));
+        }
+
+        /* Drag & Drop Visuals */
+        .seat.dragging { opacity: 0.5; transform: scale(1.1); z-index: 10; border-color: #ff6b6b; }
+        .seat.drag-over { border: 3px dashed #ff6b6b; transform: scale(0.95); }
+
+        /* Reveal Mode (Masked) */
+        .seat.masked {
+            background: #2c3e50 !important; color: transparent !important; border: 2px solid #fff !important; cursor: pointer;
+        }
+        .seat.masked .seat-name, .seat.masked .group-badge, .seat.masked .fixed-badge { opacity: 0; }
+        .seat.masked::before {
+            content: '??'; color: rgba(255,255,255,0.3); font-size: 1.5rem; position: absolute;
+            left: 50%; top: 50%; transform: translate(-50%, -50%);
+        }
+        .seat.revealed { animation: flipOpen 0.6s ease; }
+        
+        @keyframes flipOpen {
+            0% { transform: rotateY(90deg); }
+            100% { transform: rotateY(0deg); }
+        }
+
+        /* Animation */
+        .seat.shuffling { color: transparent; }
+        .seat.shuffling .seat-name { opacity: 0; }
+        .seat.shuffling::after {
+            content: '🎲'; color: #aaa; font-size: 1.5rem; position: absolute;
+            top: 50%; left: 50%; transform: translate(-50%, -50%);
+            animation: spin 0.5s infinite linear; opacity: 1;
+        }
+        .seat.pop-in { animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        @keyframes popIn { 0% { transform: scale(0); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+        @keyframes spin { 0% { transform: translate(-50%, -50%) rotate(0deg); } 100% { transform: translate(-50%, -50%) rotate(360deg); } }
+
+        /* Controls */
+        .controls {
+            padding: 10px; display: flex; justify-content: center; gap: 15px; align-items: center;
+            background: rgba(255, 255, 255, 0.1); flex-shrink: 0; flex-wrap: wrap;
+        }
+        .main-btn {
+            padding: 10px 25px; font-size: 1.1rem; border-radius: 50px; border: none;
+            cursor: pointer; font-family: var(--font-main); font-weight: bold; color: white;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2); transition: all 0.2s; white-space: nowrap;
+        }
+        .main-btn:disabled { opacity: 0.7; cursor: not-allowed; transform: none; }
+        .btn-shuffle { background: linear-gradient(45deg, #ff6b6b, #ff8e53); }
+        .btn-reset { background: linear-gradient(45deg, #4ecdc4, #556270); font-size: 0.9rem; padding: 10px 20px; }
+        
+        /* Reveal Toggle */
+        .toggle-container {
+            display: flex; align-items: center; background: rgba(255,255,255,0.8);
+            padding: 5px 10px; border-radius: 20px; gap: 5px; font-size: 0.9rem;
+        }
+        .switch { position: relative; display: inline-block; width: 40px; height: 24px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider {
+            position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #ccc; transition: .4s; border-radius: 34px;
+        }
+        .slider:before {
+            position: absolute; content: ""; height: 16px; width: 16px; left: 4px; bottom: 4px;
+            background-color: white; transition: .4s; border-radius: 50%;
+        }
+        input:checked + .slider { background-color: #2196F3; }
+        input:checked + .slider:before { transform: translateX(16px); }
+
+        /* Modal */
+        .modal-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(5px);
+            display: flex; justify-content: center; align-items: center;
+            z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.3s;
+        }
+        .modal-overlay.active { opacity: 1; pointer-events: auto; }
+        .modal-content {
+            background: white; width: 95%; max-width: 800px; height: 90%;
+            border-radius: 20px; padding: 20px; display: flex; flex-direction: column;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+        }
+        .modal-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 10px; border-bottom: 2px solid #eee; padding-bottom: 10px; flex-shrink: 0;
+        }
+        .modal-title { font-size: 1.2rem; font-weight: bold; color: #333; }
+        .close-btn { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #888; }
+
+        /* Tabs */
+        .tabs {
+            display: flex; margin-bottom: 10px; background: #f0f0f0; border-radius: 10px; padding: 4px; flex-shrink: 0; overflow-x: auto;
+        }
+        .tab-btn {
+            flex: 1; padding: 8px; border: none; background: transparent; cursor: pointer;
+            font-family: var(--font-main); font-weight: bold; border-radius: 8px; color: #777;
+            font-size: 0.85rem; transition: all 0.2s; white-space: nowrap;
+        }
+        .tab-btn.active { background: white; color: var(--text-color); box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        
+        .tab-content { flex: 1; display: none; flex-direction: column; overflow-y: auto; min-height: 0; }
+        .tab-content.active { display: flex; }
+
+        textarea {
+            width: 100%; flex: 1; padding: 10px; border: 2px solid #ddd; border-radius: 10px;
+            font-family: var(--font-main); font-size: 1rem; resize: none; margin-bottom: 10px;
+        }
+        /* 自由スクロール・リサイズ用の特別なテキストエリア */
+        textarea.free-resize {
+            flex: none; /* 親のflexに潰されないようにする */
+            resize: vertical; /* 縦方向に自由に広げられるようにする */
+        }
+        
+        .input-label { font-size: 0.9rem; color: #666; margin-bottom: 5px; display: block; font-weight: bold; }
+        
+        /* Layout Tool */
+        .layout-controls { display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px; background: #f9f9f9; padding: 10px; border-radius: 8px; flex-shrink: 0; }
+        .layout-input { width: 50px; padding: 5px; text-align: center; border: 1px solid #ddd; border-radius: 4px;}
+        
+        .layout-mode-selector {
+            display: flex; justify-content: center; flex-wrap: wrap; gap: 15px; background: #e0e0e0; padding: 8px; border-radius: 8px;
+        }
+        .layout-mode-selector label { cursor: pointer; font-weight: bold; color: #444; display: flex; align-items: center; gap: 5px; font-size: 0.9rem;}
+        .layout-mode-selector input[type="radio"] { margin: 0; }
+
+        .tool-btn { 
+            padding: 8px 16px; border: 1px solid #ddd; border-radius: 6px; background: white; cursor: pointer; 
+            font-family: var(--font-main); font-weight: bold; color: #555; transition: 0.1s;
+        }
+        .tool-btn.tool-boy.active { background: #e3f2fd; border-color: #667eea; color: #1a73e8; }
+        .tool-btn.tool-girl.active { background: var(--girl-color); border-color: #fdd835; color: #554400; }
+        .tool-btn.tool-disabled.active { background: #eee; border-color: #999; color: #555; }
+        
+        .group-btn { padding: 6px 12px; font-size: 0.9rem; }
+        .group-btn.active { background: #667eea; color: white; border-color: #5a6fd6; }
+
+        .preview-area { 
+            flex: 1; border: 1px solid #eee; border-radius: 8px; padding: 10px; 
+            overflow: auto; background: #fafafa; 
+            display: flex; flex-direction: column; align-items: center; min-height: 200px;
+        }
+        .preview-blackboard {
+            width: 50%; height: 20px; background: #204030; border: 3px solid #a0522d;
+            border-radius: 2px; margin-bottom: 15px; color: rgba(255,255,255,0.7);
+            font-size: 0.7rem; display: flex; justify-content: center; align-items: center;
+            flex-shrink: 0; letter-spacing: 2px;
+        }
+        .preview-grid { display: grid; gap: 4px; }
+        .preview-seat { width: 35px; height: 30px; border: 1px solid #ccc; border-radius: 3px; cursor: pointer; position: relative; }
+        .preview-seat.boy { background: var(--boy-color); }
+        .preview-seat.girl { background: var(--girl-color); }
+        .preview-seat.disabled { background: #555; }
+
+        /* History List */
+        .history-list { list-style: none; padding: 0; margin: 0; }
+        .history-item {
+            background: #f9f9f9; border-bottom: 1px solid #eee; padding: 10px;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .history-info { font-size: 0.9rem; font-weight: bold; color: #333; cursor: pointer; display: flex; align-items: center; gap: 5px; }
+        .history-info:hover { color: #667eea; text-decoration: underline; }
+        .history-actions button { margin-left: 5px; padding: 4px 8px; font-size: 0.8rem; cursor: pointer; border-radius: 4px; border: 1px solid #ddd; }
+
+        .save-btn {
+            width: 100%; padding: 12px; background: var(--text-color); color: white; border: none;
+            border-radius: 10px; font-size: 1.1rem; font-weight: bold; cursor: pointer; margin-top: 10px; flex-shrink: 0;
+        }
+
+        /* Toast Notification */
+        .toast {
+            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(100px);
+            background: rgba(0,0,0,0.8); color: white; padding: 10px 20px; border-radius: 30px;
+            font-size: 0.9rem; pointer-events: none; opacity: 0; transition: all 0.3s; z-index: 200;
+            white-space: nowrap; box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        }
+        .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+
+        /* Background Upload */
+        .bg-upload-container {
+            display: flex; flex-direction: column; gap: 10px; align-items: center; padding: 20px;
+            background: #f5f5f5; border-radius: 10px; border: 2px dashed #ccc;
+        }
+        .file-input { display: none; }
+        .file-label {
+            padding: 10px 20px; background: #667eea; color: white; border-radius: 5px; cursor: pointer;
+            transition: 0.2s; font-weight: bold;
+        }
+        .file-label:hover { background: #5a6fd6; }
+        .bg-reset-btn {
+            padding: 5px 15px; background: #eee; border: 1px solid #ccc; border-radius: 5px; cursor: pointer;
+            font-size: 0.9rem; color: #555;
+        }
+
+        /* Print Style */
+        @media print {
+            @page { margin: 10mm; }
+            body { background: white !important; background-image: none !important; height: 100%; margin: 0; overflow: hidden; }
+            .app-container { box-shadow: none; border: none; height: 95vh; width: 100%; max-width: none; border-radius: 0; }
+            header, .controls, .modal-overlay, .toast { display: none !important; }
+            .seat { border: 1px solid #000 !important; color: #000 !important; box-shadow: none !important; break-inside: avoid; min-height: 60px; }
+            .seat.masked { background: white !important; color: transparent !important; } 
+            .seat.masked .seat-name, .seat.masked .group-badge, .seat.masked .fixed-badge { opacity: 1 !important; } /* 印刷時は見えるように */
+            .blackboard-area { margin-bottom: 20px; }
+        }
+
+        @media (max-width: 600px) {
+            .header-btn span { display: none; } /* アイコンのみ */
+            .tabs { font-size: 0.8rem; }
+            .seat { font-size: 0.7rem; }
+            .layout-mode-selector { flex-direction: column; align-items: flex-start; gap: 8px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="app-container" id="captureArea">
+    <header>
+        <h1>教室席替え</h1>
+        <div class="header-controls">
+            <button class="header-btn" onclick="saveImage()">📷 <span>保存/印刷</span></button>
+            <button class="header-btn" onclick="openSettings()">⚙️ <span>設定</span></button>
+        </div>
+    </header>
+
+    <div class="blackboard-area">
+        <div class="blackboard">黒　板</div>
+    </div>
+
+    <div class="seating-area">
+        <div class="seat-grid" id="seatGrid">
+            <!-- Seats Generated Here -->
+        </div>
+    </div>
+
+    <div class="controls">
+        <div class="toggle-container">
+            <label class="switch">
+                <input type="checkbox" id="revealModeCheck">
+                <span class="slider"></span>
+            </label>
+            <span onclick="document.getElementById('revealModeCheck').click()">めくりモード</span>
+        </div>
+        <button class="main-btn btn-reset" onclick="resetSeats()">リセット</button>
+        <button class="main-btn btn-shuffle" onclick="startShuffle()">🎲 席替え</button>
+    </div>
+
+    <!-- Settings Modal -->
+    <div class="modal-overlay" id="settingsModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="modal-title">設定・名簿</span>
+                <button class="close-btn" onclick="closeSettings()">×</button>
+            </div>
+
+            <div class="tabs">
+                <button class="tab-btn active" onclick="switchTab('boys', this)">👦 男子</button>
+                <button class="tab-btn" onclick="switchTab('girls', this)">👧 女子</button>
+                <button class="tab-btn" onclick="switchTab('rules', this)">⚠️ ルール</button>
+                <button class="tab-btn" onclick="switchTab('vision', this)">👓 配慮</button>
+                <button class="tab-btn" onclick="switchTab('layout', this)">📐 配置・班</button>
+                <button class="tab-btn" onclick="switchTab('bg', this)">🎨 背景</button>
+                <button class="tab-btn" onclick="switchTab('history', this)">📜 履歴</button>
+            </div>
+
+            <!-- Tab Contents -->
+            <div id="tab-boys" class="tab-content active">
+                <label class="input-label">男子名簿 (改行区切り)</label>
+                <textarea id="boysInput"></textarea>
+            </div>
+            <div id="tab-girls" class="tab-content">
+                <label class="input-label">女子名簿 (改行区切り)</label>
+                <textarea id="girlsInput"></textarea>
+            </div>
+            
+            <div id="tab-rules" class="tab-content">
+                <label class="input-label" style="color:#e53935;">離したいペア (NG)</label>
+                <p style="font-size:0.8rem; color:#666; margin:0 0 5px 0;">前後左右・斜めの隣接、および<strong>同じ班への配置</strong>を回避します</p>
+                <textarea id="badRulesInput" class="free-resize" style="background:#ffebee; height:150px;" placeholder="佐藤 鈴木 (スペース区切り)&#10;高橋 田中 (改行して複数入力)"></textarea>
+                
+                <label class="input-label" style="color:#1e88e5; margin-top: 15px;">隣にしたいペア (仲良し)</label>
+                <p style="font-size:0.8rem; color:#666; margin:0 0 5px 0;">横並びのペア席（1-2列目、3-4列目など）に優先配置します。<br>※席の性別指定と合わない場合は配置できません。</p>
+                <textarea id="goodRulesInput" class="free-resize" style="background:#e3f2fd; height:150px;" placeholder="伊藤 山本 (優先的に隣配置)&#10;中村 小林 (改行して複数入力)"></textarea>
+
+                <!-- リーダー設定セクション -->
+                <div style="margin-top: 15px; padding-top: 15px; border-top: 1px dashed #ccc;">
+                    <div style="display:flex; gap:10px; align-items:center; margin-bottom:5px;">
+                        <label class="input-label" style="color:#8e24aa; margin:0;">👑 リーダー分散配置</label>
+                        <label style="font-size:0.9rem; display:flex; align-items:center; gap:5px; cursor:pointer;">
+                            <input type="checkbox" id="useLeadersCheck"> 有効にする
+                        </label>
+                    </div>
+                    <p style="font-size:0.8rem; color:#666; margin:0 0 5px 0;">有効にすると、ここに入力された人たちが同じ班にならないように分散します。<br>※「📐 配置・班」タブで班を設定しておく必要があります。</p>
+                    <textarea id="leadersInput" class="free-resize" style="background:#f3e5f5; height:100px; border: 1px solid #ce93d8;" placeholder="佐藤&#10;鈴木&#10;田中"></textarea>
+                </div>
+            </div>
+            
+            <div id="tab-vision" class="tab-content">
+                <div style="display:flex; gap:10px; margin-bottom:5px; align-items:center;">
+                    <label class="input-label" style="color:#e91e63; margin:0;">最前列 必須</label>
+                    <span style="font-size:0.75rem; color:#888;">(最優先)</span>
+                </div>
+                <textarea id="visionFrontInput" class="free-resize" style="background:#fce4ec; height:120px; margin-bottom:15px;" placeholder="ここに名前を書くと、必ず最前列になります。"></textarea>
+
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+                    <div style="display:flex; gap:10px; align-items:center;">
+                        <label class="input-label" style="color:#4caf50; margin:0;">前方エリア 希望</label>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:5px; font-size:0.9rem;">
+                        <span id="visionRowVal" style="font-weight:bold; color:#333;">2</span> 列目まで
+                        <input type="range" id="visionRowsInput" min="1" max="5" value="2" style="width:80px;" oninput="document.getElementById('visionRowVal').textContent = this.value">
+                    </div>
+                </div>
+                <textarea id="visionNearInput" class="free-resize" style="background:#e8f5e9; height:120px;" placeholder="ここに名前を書くと、指定列目までに優先配置されます。"></textarea>
+            </div>
+            
+            <div id="tab-layout" class="tab-content">
+                <div class="layout-controls">
+                    <div style="display:flex; gap:10px; align-items:center; width:100%;">
+                        <span>横 <input type="number" id="colInput" class="layout-input" min="1" max="10" onchange="resizeGrid()"></span>
+                        <span>縦 <input type="number" id="rowInput" class="layout-input" min="1" max="10" onchange="resizeGrid()"></span>
+                        <button onclick="resetLayoutPattern()" style="margin-left:auto; font-size:0.75rem; background:none; border:none; text-decoration:underline; cursor:pointer; color:#666;">市松模様に戻す</button>
+                    </div>
+                    
+                    <div class="layout-mode-selector">
+                        <label><input type="radio" name="layoutMode" value="type" checked onchange="changeLayoutMode()"> 🪑 席の種類</label>
+                        <label><input type="radio" name="layoutMode" value="group" onchange="changeLayoutMode()"> 👥 班</label>
+                        <label><input type="radio" name="layoutMode" value="fixed" onchange="changeLayoutMode()"> 📌 固定席</label>
+                    </div>
+
+                    <div id="typeTools" class="tool-selector" style="display:flex; gap:5px; justify-content:center; flex-wrap:wrap;">
+                         <button class="tool-btn tool-boy active" onclick="setTool('boy', this)">男子</button>
+                         <button class="tool-btn tool-girl" onclick="setTool('girl', this)">女子</button>
+                         <button class="tool-btn tool-disabled" onclick="setTool('disabled', this)">使用しない</button>
+                    </div>
+
+                    <div id="groupTools" class="tool-selector" style="display:none; gap:5px; justify-content:center; flex-wrap:wrap;">
+                         <button class="tool-btn group-btn" data-group="0" onclick="setGroupTool(0, this)">解除</button>
+                         <button class="tool-btn group-btn active" data-group="1" onclick="setGroupTool(1, this)">1班</button>
+                         <button class="tool-btn group-btn" data-group="2" onclick="setGroupTool(2, this)">2班</button>
+                         <button class="tool-btn group-btn" data-group="3" onclick="setGroupTool(3, this)">3班</button>
+                         <button class="tool-btn group-btn" data-group="4" onclick="setGroupTool(4, this)">4班</button>
+                         <button class="tool-btn group-btn" data-group="5" onclick="setGroupTool(5, this)">5班</button>
+                         <button class="tool-btn group-btn" data-group="6" onclick="setGroupTool(6, this)">6班</button>
+                         <button class="tool-btn group-btn" data-group="7" onclick="setGroupTool(7, this)">7班</button>
+                         <button class="tool-btn group-btn" data-group="8" onclick="setGroupTool(8, this)">8班</button>
+                         <button class="tool-btn group-btn" data-group="9" onclick="setGroupTool(9, this)">9班</button>
+                         <button class="tool-btn group-btn" data-group="10" onclick="setGroupTool(10, this)">10班</button>
+                    </div>
+
+                    <div id="fixedTools" class="tool-selector" style="display:none; flex-direction:column; align-items:center; gap:5px; margin-top:5px;">
+                        <p style="font-size:0.8rem; color:#666; margin:0;">座席をクリックして、固定したい名前を入力してください。</p>
+                    </div>
+                </div>
+                <div class="preview-area">
+                    <div class="preview-blackboard">黒　板</div>
+                    <div class="preview-grid" id="previewGrid"></div>
+                </div>
+            </div>
+            <div id="tab-bg" class="tab-content">
+                <div class="bg-upload-container">
+                    <p style="margin:0; font-size:0.9rem; color:#666;">お好みの画像（教室の写真など）を背景に設定できます。<br>※画像はサーバーに送信されず、この端末内でのみ使用されます。</p>
+                    <label class="file-label">
+                        📁 画像を選択
+                        <input type="file" id="bgInput" class="file-input" accept="image/*" onchange="handleBgUpload(this)">
+                    </label>
+                    <button class="bg-reset-btn" onclick="resetBg()">背景をリセット</button>
+                </div>
+            </div>
+            <div id="tab-history" class="tab-content">
+                <p style="font-size:0.8rem; color:#666; margin:0 0 10px 0;">※設定内容（名簿、配慮、ルールなど）もすべてセットで保存・復元されます。</p>
+                <ul class="history-list" id="historyList"></ul>
+                <button onclick="saveCurrentToHistory()" style="margin-top:10px; padding:8px; width:100%;">現在の状態を新しく保存</button>
+            </div>
+
+            <button class="save-btn" onclick="saveAndCloseSettings()">保存して閉じる</button>
+        </div>
+    </div>
+    
+    <!-- Toast Notification -->
+    <div id="toast" class="toast">メッセージ</div>
+</div>
+
+<script>
+    // --- Audio Assets & Synthesizer ---
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+    // ユーザー指定の音声ファイル (GitHub raw links)
+    const externalSounds = {
+        drum: new Audio('https://raw.githubusercontent.com/byakusen/oto/main/drum.mp3'),
+        cymbal: new Audio('https://raw.githubusercontent.com/byakusen/oto/main/jan.mp3')
+    };
+    
+    // 設定
+    externalSounds.drum.loop = true; // ドラムロールはループ再生
+    externalSounds.drum.preload = 'auto';
+    externalSounds.cymbal.preload = 'auto';
+
+    // 音声コントローラー
+    const soundController = {
+        startDrumRoll: () => {
+            // 外部ファイル再生を試みる
+            externalSounds.drum.currentTime = 0;
+            externalSounds.drum.play().catch(e => {
+                console.warn("External drum sound failed", e);
+                // エラー時は何もしない（サイレント）
+            });
+        },
+        stopDrumRoll: () => {
+            externalSounds.drum.pause();
+            externalSounds.drum.currentTime = 0;
+        },
+        cymbal: () => {
+            externalSounds.cymbal.currentTime = 0;
+            externalSounds.cymbal.play().catch(e => {
+                console.warn("External cymbal sound failed", e);
+            });
+        },
+        pop: () => {
+            // ポップ音は指定がないのでWeb Audio APIで生成（軽量で確実）
+            if(audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(800, audioCtx.currentTime + 0.1);
+            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.3);
+        }
+    };
+
+    // --- Toast Notification System ---
+    function showToast(message) {
+        const toast = document.getElementById('toast');
+        toast.textContent = message;
+        toast.classList.add('show');
+        setTimeout(() => { toast.classList.remove('show'); }, 3000);
+    }
+
+    // --- Data Defaults ---
+    const defaultBoys = ["佐藤", "鈴木", "高橋", "田中", "渡辺", "伊藤", "山本", "中村", "小林", "加藤", "吉田", "山田", "佐々木", "山口", "松本"];
+    const defaultGirls = ["井上", "木村", "林", "斎藤", "清水", "山崎", "森", "阿部", "池田", "橋本", "山下", "石川", "中島", "前田", "藤田"];
+
+    // --- State ---
+    let state = {
+        cols: 6, rows: 5,
+        boys: [], girls: [],
+        badPairs: [], goodPairs: [],
+        visionFront: [], visionNear: [], visionNearRows: 2,
+        leaders: [], useLeaders: false, // 👑 リーダー機能追加
+        seatLayout: {}, // "r-c": "boy"|"girl"|"disabled"
+        seatGroups: {}, // "r-c": 1~12 (Group Number)
+        fixedSeats: {}, // "r-c": "Name" (固定席)
+        shuffledSeats: {}, // "r-c": Name
+        history: [],
+        bgImage: null // Base64 data for background
+    };
+    
+    // UI Tools State
+    let currentLayoutMode = 'type'; // 'type' or 'group' or 'fixed'
+    let currentTool = 'boy';
+    let currentGroupTool = 1;
+
+    // --- Group Colors ---
+    function getGroupColor(num) {
+        const colors = [
+            '#e53935', '#f57c00', '#fbc02d', '#43a047', '#0288d1', '#1e88e5', 
+            '#5e35b1', '#8e24aa', '#d81b60', '#6d4c41', '#546e7a', '#00897b'
+        ];
+        return colors[(num - 1) % colors.length] || '#333';
+    }
+
+    // --- Init & Load ---
+    window.onload = () => {
+        loadState();
+        renderGrid(true);
+        if(state.bgImage) document.body.style.backgroundImage = `url(${state.bgImage})`;
+        
+        // Window resize event to refit text
+        window.addEventListener('resize', () => {
+            renderGrid(false); // Re-render to refit text properly
+        });
+
+        // User interaction unlock for Web Audio API (pop sound)
+        document.body.addEventListener('click', () => {
+            if(audioCtx.state === 'suspended') audioCtx.resume();
+        }, {once:true});
+    };
+
+    function loadState() {
+        const stored = localStorage.getItem('seatingApp_Pro');
+        if (stored) {
+            const parsed = JSON.parse(stored);
+            state = { ...state, ...parsed };
+            // Data Migration
+            if (parsed.visionList && parsed.visionList.length > 0) {
+                if (!state.visionNear) state.visionNear = [];
+                state.visionNear = [...new Set([...state.visionNear, ...parsed.visionList])];
+                delete state.visionList;
+            }
+            if (!state.visionFront) state.visionFront = [];
+            if (!state.visionNear) state.visionNear = [];
+            if (!state.visionNearRows) state.visionNearRows = 2;
+            if (!state.seatGroups) state.seatGroups = {};
+            if (!state.fixedSeats) state.fixedSeats = {};
+            if (parsed.leaders === undefined) state.leaders = [];
+            if (parsed.useLeaders === undefined) state.useLeaders = false;
+            if (!state.history) state.history = [];
+        } else {
+            state.boys = [...defaultBoys];
+            state.girls = [...defaultGirls];
+            resetLayoutPattern(true);
+        }
+        updateUIInputs();
+    }
+
+    function updateUIInputs() {
+        document.getElementById('boysInput').value = state.boys.join('\n');
+        document.getElementById('girlsInput').value = state.girls.join('\n');
+        document.getElementById('badRulesInput').value = state.badPairs.map(p=>p.replace(',',' ')).join('\n');
+        document.getElementById('goodRulesInput').value = state.goodPairs.map(p=>p.replace(',',' ')).join('\n');
+        document.getElementById('visionFrontInput').value = state.visionFront.join('\n');
+        document.getElementById('visionNearInput').value = state.visionNear.join('\n');
+        document.getElementById('visionRowsInput').value = state.visionNearRows;
+        document.getElementById('visionRowVal').textContent = state.visionNearRows;
+        
+        document.getElementById('leadersInput').value = state.leaders.join('\n');
+        document.getElementById('useLeadersCheck').checked = state.useLeaders;
+
+        document.getElementById('colInput').value = state.cols;
+        document.getElementById('rowInput').value = state.rows;
+        renderHistory();
+    }
+
+    function saveState() {
+        state.boys = parseLines('boysInput');
+        state.girls = parseLines('girlsInput');
+        state.badPairs = parsePairs('badRulesInput');
+        state.goodPairs = parsePairs('goodRulesInput');
+        state.visionFront = parseLines('visionFrontInput');
+        state.visionNear = parseLines('visionNearInput');
+        state.visionNearRows = parseInt(document.getElementById('visionRowsInput').value) || 2;
+        
+        state.leaders = parseLines('leadersInput');
+        state.useLeaders = document.getElementById('useLeadersCheck').checked;
+
+        localStorage.setItem('seatingApp_Pro', JSON.stringify(state));
+    }
+
+    function parseLines(id) {
+        return document.getElementById(id).value.split('\n').map(s=>s.trim()).filter(s=>s!=="");
+    }
+    function parsePairs(id) {
+        const pairs = [];
+        document.getElementById(id).value.split('\n').forEach(line => {
+            const parts = line.trim().split(/\s+|　+/).filter(s=>s!=="");
+            if(parts.length>=2) {
+                for(let i=0; i<parts.length; i++) for(let j=i+1; j<parts.length; j++) 
+                    pairs.push([parts[i], parts[j]].sort().join(','));
+            }
+        });
+        return [...new Set(pairs)];
+    }
+
+    // --- Background Handling ---
+    function handleBgUpload(input) {
+        const file = input.files[0];
+        if(!file) return;
+        
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const bgData = e.target.result;
+            state.bgImage = bgData;
+            document.body.style.backgroundImage = `url(${bgData})`;
+            saveState(); // Save locally (careful with size limits, but localStorage usually 5MB)
+            showToast("背景を設定しました");
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function resetBg() {
+        state.bgImage = null;
+        document.body.style.backgroundImage = '';
+        saveState();
+        showToast("背景をリセットしました");
+    }
+
+    // --- Main Logic (Allocation) ---
+    function solveAllocation() {
+        const fullSeatMap = {};
+        const seatKeysByType = { boy: [], girl: [] };
+        
+        for(let r=0; r<state.rows; r++){
+            for(let c=0; c<state.cols; c++){
+                const key = `${r}-${c}`;
+                const type = state.seatLayout[key] || ((r+c)%2===0?'boy':'girl');
+                if(type !== 'disabled') {
+                    fullSeatMap[key] = type;
+                    if(seatKeysByType[type]) seatKeysByType[type].push(key);
+                }
+            }
+        }
+
+        let boySeats = seatKeysByType.boy.map(k => {
+            const [r,c] = k.split('-').map(Number);
+            return {r, c, key: k};
+        }).sort((a,b) => a.r - b.r);
+
+        let girlSeats = seatKeysByType.girl.map(k => {
+            const [r,c] = k.split('-').map(Number);
+            return {r, c, key: k};
+        }).sort((a,b) => a.r - b.r);
+
+        const shuffle = arr => arr.sort(()=>Math.random()-0.5);
+        let boys = shuffle([...state.boys]);
+        let girls = shuffle([...state.girls]);
+        let allocation = {};
+
+        // === 固定席の割り当て（最優先） ===
+        if (state.fixedSeats) {
+            for (const [key, name] of Object.entries(state.fixedSeats)) {
+                if (state.seatLayout[key] !== 'disabled') {
+                    allocation[key] = name;
+                    // 名簿から除外
+                    if (boys.includes(name)) boys.splice(boys.indexOf(name), 1);
+                    else if (girls.includes(name)) girls.splice(girls.indexOf(name), 1);
+                    
+                    // 空席リストから除外
+                    const bIdx = boySeats.findIndex(s => s.key === key);
+                    if (bIdx > -1) boySeats.splice(bIdx, 1);
+                    const gIdx = girlSeats.findIndex(s => s.key === key);
+                    if (gIdx > -1) girlSeats.splice(gIdx, 1);
+                }
+            }
+        }
+
+        // 2. Vision Care Allocation
+        const assignListRandomly = (list, maxRow) => {
+            const shuffledList = shuffle([...list]);
+            shuffledList.forEach(name => {
+                let pPool = null;
+                let sPool = null;
+                if (boys.includes(name)) { pPool = boys; sPool = boySeats; }
+                else if (girls.includes(name)) { pPool = girls; sPool = girlSeats; }
+
+                if (pPool && sPool) {
+                    const validIndices = [];
+                    for(let i=0; i<sPool.length; i++) {
+                        if(sPool[i].r < maxRow) validIndices.push(i);
+                    }
+                    if (validIndices.length > 0) {
+                        const randomI = validIndices[Math.floor(Math.random() * validIndices.length)];
+                        const seat = sPool.splice(randomI, 1)[0]; 
+                        pPool.splice(pPool.indexOf(name), 1); 
+                        allocation[seat.key] = name;
+                    }
+                }
+            });
+        };
+
+        assignListRandomly(state.visionFront, 1);
+        assignListRandomly(state.visionNear, state.visionNearRows);
+
+        boySeats.forEach(s => { if(boys.length) allocation[s.key] = boys.pop(); });
+        girlSeats.forEach(s => { if(girls.length) allocation[s.key] = girls.pop(); });
+
+        let violations = getViolations(allocation);
+        for(let i=0; i<3000 && violations.length>0; i++) {
+            const v = violations[Math.floor(Math.random()*violations.length)];
+            const k1 = findKey(v.p1, allocation);
+            
+            // 固定席はスワップの対象にしない
+            if(!k1 || (state.fixedSeats && state.fixedSeats[k1])) continue; 
+            
+            const type1 = fullSeatMap[k1];
+            // スワップ先も固定席以外から選ぶ
+            const candidateKeys = seatKeysByType[type1].filter(k => !(state.fixedSeats && state.fixedSeats[k]));
+            if(!candidateKeys || candidateKeys.length === 0) continue;
+            const targetKey = candidateKeys[Math.floor(Math.random()*candidateKeys.length)];
+            
+            const temp = allocation[targetKey];
+            allocation[targetKey] = allocation[k1];
+            allocation[k1] = temp;
+            
+            if (!checkVisionConstraint(k1, allocation[k1]) || !checkVisionConstraint(targetKey, allocation[targetKey])) {
+                const temp2 = allocation[targetKey];
+                allocation[targetKey] = allocation[k1];
+                allocation[k1] = temp2;
+                continue;
+            }
+
+            const newV = getViolations(allocation);
+            if(newV.length > violations.length) {
+                const temp2 = allocation[targetKey];
+                allocation[targetKey] = allocation[k1];
+                allocation[k1] = temp2;
+            } else {
+                violations = newV;
+            }
+        }
+        return allocation;
+    }
+
+    function checkVisionConstraint(key, name) {
+        if (!name) return true;
+        // 固定席の人は配慮制約のチェックをスキップ（固定席を最優先）
+        if (state.fixedSeats && Object.values(state.fixedSeats).includes(name)) return true;
+
+        const [r, c] = key.split('-').map(Number);
+        if (state.visionFront.includes(name)) { if (r !== 0) return false; }
+        else if (state.visionNear.includes(name)) { if (r >= state.visionNearRows) return false; }
+        return true;
+    }
+
+    function findKey(name, alloc) { return Object.keys(alloc).find(k=>alloc[k]===name); }
+
+    function getViolations(alloc) {
+        let v = [];
+        // 斜めも含めた周囲8方向をチェック
+        const directions = [
+            [0, 1],  // 右
+            [1, 0],  // 下
+            [1, 1],  // 右下（斜め後ろ）
+            [1, -1]  // 左下（斜め後ろ）
+        ];
+
+        for(let r=0; r<state.rows; r++) for(let c=0; c<state.cols; c++) {
+            const k = `${r}-${c}`;
+            const n1 = alloc[k];
+            if(!n1) continue;
+            
+            directions.forEach(([dr,dc]) => {
+                const nr = r + dr;
+                const nc = c + dc;
+                // 範囲内チェック
+                if(nr >= 0 && nr < state.rows && nc >= 0 && nc < state.cols) {
+                    const nk = `${nr}-${nc}`;
+                    const n2 = alloc[nk];
+                    if(n2) {
+                        const p = [n1,n2].sort().join(',');
+                        if(state.badPairs.includes(p)) v.push({type:'bad', p1:n1});
+                    }
+                }
+            });
+        }
+        
+        // --- NGペアが同じ班にいないかチェック ---
+        state.badPairs.forEach(pStr => {
+            const [p1, p2] = pStr.split(',');
+            const k1 = findKey(p1, alloc);
+            const k2 = findKey(p2, alloc);
+            if (k1 && k2) {
+                const g1 = state.seatGroups ? state.seatGroups[k1] : null;
+                const g2 = state.seatGroups ? state.seatGroups[k2] : null;
+                if (g1 && g2 && g1 === g2) {
+                    v.push({type: 'bad_group', p1: p1});
+                }
+            }
+        });
+
+        // --- リーダー分散チェック ---
+        if (state.useLeaders && state.leaders.length > 0 && state.seatGroups && Object.keys(state.seatGroups).length > 0) {
+            let groupLeaders = {};
+            for(let r=0; r<state.rows; r++) for(let c=0; c<state.cols; c++) {
+                const k = `${r}-${c}`;
+                const name = alloc[k];
+                if (name && state.leaders.includes(name)) {
+                    const g = state.seatGroups[k];
+                    if (g) {
+                        if (!groupLeaders[g]) groupLeaders[g] = [];
+                        groupLeaders[g].push(name);
+                    }
+                }
+            }
+            
+            for (const g in groupLeaders) {
+                const leadersInGroup = groupLeaders[g];
+                if (leadersInGroup.length > 1) {
+                    // 同じ班に複数のリーダーがいる場合、全ての組み合わせに対して違反をカウントしてペナルティを重くする
+                    for(let i=0; i<leadersInGroup.length; i++) {
+                        for(let j=i+1; j<leadersInGroup.length; j++) {
+                            v.push({type: 'leader_overlap', p1: leadersInGroup[i], p2: leadersInGroup[j]});
+                            v.push({type: 'leader_overlap', p1: leadersInGroup[j], p2: leadersInGroup[i]});
+                        }
+                    }
+                }
+            }
+        }
+
+        // Good Pairs (Missing Adjacency)
+        state.goodPairs.forEach(pStr => {
+            const [p1,p2] = pStr.split(',');
+            const k1 = findKey(p1,alloc), k2 = findKey(p2,alloc);
+            if(k1 && k2) {
+                const [r1,c1] = k1.split('-').map(Number);
+                const [r2,c2] = k2.split('-').map(Number);
+                // 良いペアの条件: 同じ行、かつ隣接、かつ左側が偶数列（1-2列目、3-4列目...のペア）
+                const isPaired = (r1 === r2) && (Math.abs(c1 - c2) === 1) && (Math.min(c1, c2) % 2 === 0);
+                if(!isPaired) v.push({type:'good', p1:p1});
+            }
+        });
+        return v;
+    }
+
+    // --- Font Sizing Logic (Shrink to Fit) ---
+    function fitText(seat) {
+        const span = seat.querySelector('.seat-name');
+        if (!span) return;
+        
+        // Reset to measure natural size
+        span.style.transform = 'none';
+        span.style.display = 'inline-block';
+        
+        const seatWidth = seat.clientWidth;
+        // Padding (2px * 2) + minimal margin
+        const availableWidth = seatWidth - 6; 
+        const textWidth = span.scrollWidth;
+
+        if (textWidth > availableWidth && textWidth > 0) {
+            const scale = availableWidth / textWidth;
+            span.style.transform = `scale(${scale})`;
+        }
+    }
+
+    // --- Interaction ---
+    function startShuffle() {
+        const btn = document.querySelector('.btn-shuffle');
+        if(btn.disabled) return;
+        
+        // 1. UI Feedback
+        btn.disabled = true;
+        const originalText = btn.textContent;
+        btn.textContent = "抽選中...";
+        btn.style.opacity = "0.7";
+        
+        // 2. Start Sound IMMEDIATELY (Key fix for autoplay policy)
+        soundController.startDrumRoll();
+
+        // 3. Async Calculation
+        setTimeout(() => {
+            try {
+                saveState();
+                const finalAlloc = solveAllocation();
+                const seats = document.querySelectorAll('.seat:not(.disabled)');
+                const revealMode = document.getElementById('revealModeCheck').checked;
+                
+                // Visual Shuffle
+                let step=0;
+                const interval = setInterval(()=>{
+                    step++;
+                    
+                    seats.forEach(s => {
+                        s.classList.add('shuffling');
+                        s.classList.remove('masked', 'revealed');
+                        
+                        // Update text via span for shuffling visual
+                        let span = s.querySelector('.seat-name');
+                        if (!span) {
+                            span = document.createElement('span');
+                            span.className = 'seat-name';
+                            s.appendChild(span);
+                        }
+                        span.textContent = ""; // Clear text during shuffle or show '?'
+                        
+                        // fitText is NOT called during shuffle to save performance
+                    });
+                    if(step > 20) {
+                        clearInterval(interval);
+                        applyResults(finalAlloc, revealMode);
+                        
+                        // Restore button
+                        btn.disabled = false;
+                        btn.textContent = originalText;
+                        btn.style.opacity = "1";
+                    }
+                }, 80);
+            } catch(e) {
+                console.error(e);
+                soundController.stopDrumRoll(); // Stop sound on error
+                showToast("エラー: " + e.message);
+                btn.disabled = false;
+                btn.textContent = originalText;
+                btn.style.opacity = "1";
+            }
+        }, 50);
+    }
+
+    function applyResults(alloc, revealMode) {
+        state.shuffledSeats = alloc;
+        renderGrid(false); // Re-render to attach fresh event listeners & FIT TEXT
+        
+        // Stop Drum Roll and Play Cymbal
+        soundController.stopDrumRoll();
+        if(!revealMode) soundController.cymbal(); 
+
+        const seats = document.querySelectorAll('.seat:not(.disabled)');
+        seats.forEach(s => {
+            s.classList.remove('shuffling');
+            if(revealMode) {
+                s.classList.add('masked');
+                s.onclick = function() {
+                    if(s.classList.contains('masked')) {
+                        s.classList.remove('masked');
+                        s.classList.add('revealed');
+                        soundController.pop(); // Pop sound uses Web Audio
+                    }
+                };
+            } else {
+                s.classList.add('pop-in');
+            }
+        });
+        
+        confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
+    }
+
+    // --- Drag & Drop ---
+    let dragSrcEl = null;
+    function handleDragStart(e) {
+        this.classList.add('dragging');
+        dragSrcEl = this;
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', this.dataset.key);
+    }
+    function handleDragOver(e) {
+        if (e.preventDefault) e.preventDefault();
+        this.classList.add('drag-over');
+        e.dataTransfer.dropEffect = 'move';
+        return false;
+    }
+    function handleDragLeave(e) { this.classList.remove('drag-over'); }
+    function handleDrop(e) {
+        if (e.stopPropagation) e.stopPropagation();
+        const dest = this;
+        dest.classList.remove('drag-over');
+        if (dragSrcEl !== dest) {
+            const srcKey = dragSrcEl.dataset.key;
+            const destKey = dest.dataset.key;
+            const srcName = state.shuffledSeats[srcKey];
+            const destName = state.shuffledSeats[destKey];
+            state.shuffledSeats[srcKey] = destName;
+            state.shuffledSeats[destKey] = srcName;
+            
+            // 手動で動かした場合は固定席を解除する（直感的な操作のため）
+            if (state.fixedSeats && state.fixedSeats[srcKey]) delete state.fixedSeats[srcKey];
+            if (state.fixedSeats && state.fixedSeats[destKey]) delete state.fixedSeats[destKey];
+
+            renderGrid(false);
+        }
+        return false;
+    }
+    function handleDragEnd(e) {
+        this.classList.remove('dragging');
+        document.querySelectorAll('.seat').forEach(s => s.classList.remove('drag-over'));
+    }
+
+    function renderGrid(animate) {
+        const grid = document.getElementById('seatGrid');
+        grid.style.gridTemplateColumns = `repeat(${state.cols}, 1fr)`;
+        grid.style.gridTemplateRows = `repeat(${state.rows}, 1fr)`;
+        grid.innerHTML = '';
+
+        for(let r=0; r<state.rows; r++){
+            for(let c=0; c<state.cols; c++){
+                const key = `${r}-${c}`;
+                const type = state.seatLayout[key] || ((r+c)%2===0?'boy':'girl');
+                const el = document.createElement('div');
+                el.className = `seat ${type}`;
+                el.dataset.key = key;
+
+                if(type !== 'disabled') {
+                    el.draggable = true;
+                    el.addEventListener('dragstart', handleDragStart);
+                    el.addEventListener('dragover', handleDragOver);
+                    el.addEventListener('dragleave', handleDragLeave);
+                    el.addEventListener('drop', handleDrop);
+                    el.addEventListener('dragend', handleDragEnd);
+
+                    // --- Group Badge ---
+                    const groupNum = state.seatGroups ? state.seatGroups[key] : null;
+                    if (groupNum) {
+                        const badge = document.createElement('div');
+                        badge.className = 'group-badge';
+                        badge.textContent = groupNum + '班';
+                        badge.style.backgroundColor = getGroupColor(groupNum);
+                        el.appendChild(badge);
+                    }
+
+                    // --- Fixed Badge ---
+                    const fixedName = state.fixedSeats ? state.fixedSeats[key] : null;
+                    if (fixedName) {
+                        const fBadge = document.createElement('div');
+                        fBadge.className = 'fixed-badge';
+                        fBadge.textContent = '📌';
+                        fBadge.title = '固定席';
+                        el.appendChild(fBadge);
+                    }
+
+                    const name = state.shuffledSeats[key];
+                    // Name Wrapper Span
+                    const span = document.createElement('span');
+                    span.className = 'seat-name';
+                    span.textContent = name || "";
+                    el.appendChild(span);
+
+                    if(animate) {
+                        el.style.animationDelay = `${(r*state.cols+c)*0.02}s`;
+                        el.classList.add('pop-in');
+                    }
+                }
+                grid.appendChild(el);
+            }
+        }
+        
+        // Fit text after rendering
+        // Use requestAnimationFrame to ensure layout is ready
+        requestAnimationFrame(() => {
+            document.querySelectorAll('.seat:not(.disabled)').forEach(seat => fitText(seat));
+        });
+    }
+
+    // --- History ---
+    function saveCurrentToHistory() {
+        if(!Object.keys(state.shuffledSeats).length) return showToast("保存する座席データがありません");
+        
+        // 保存する前に現在の入力欄の状態を確実にstateへ反映させる
+        saveState();
+
+        const defaultName = new Date().toLocaleString();
+        const name = prompt("保存する履歴の名前を入力してください\n例：「4月の席」「1学期中間」など", defaultName);
+        if(name === null) return; // キャンセルされた場合
+
+        const entry = {
+            name: name || defaultName,
+            date: defaultName,
+            layout: state.seatLayout,
+            groups: state.seatGroups, // Save groups history too
+            fixedSeats: state.fixedSeats, // Save fixed seats history too
+            seats: state.shuffledSeats,
+            cols: state.cols, rows: state.rows,
+            // --- 設定内容も丸ごと保存 ---
+            boys: [...state.boys],
+            girls: [...state.girls],
+            badPairs: [...state.badPairs],
+            goodPairs: [...state.goodPairs],
+            visionFront: [...state.visionFront],
+            visionNear: [...state.visionNear],
+            visionNearRows: state.visionNearRows,
+            leaders: [...state.leaders],
+            useLeaders: state.useLeaders
+        };
+        state.history.unshift(entry);
+        // 保存件数を10件に拡張
+        if(state.history.length > 10) state.history.pop();
+        saveState();
+        renderHistory();
+        showToast("履歴に保存しました");
+    }
+
+    function renderHistory() {
+        const list = document.getElementById('historyList');
+        list.innerHTML = "";
+        state.history.forEach((h, idx) => {
+            const li = document.createElement('li');
+            li.className = 'history-item';
+            const displayName = h.name || h.date;
+            li.innerHTML = `
+                <span class="history-info" onclick="renameHistory(${idx})" title="名前を変更する">✏️ ${displayName}</span>
+                <div class="history-actions">
+                    <button onclick="loadHistory(${idx})">復元</button>
+                    <button onclick="deleteHistory(${idx})">削除</button>
+                </div>
+            `;
+            list.appendChild(li);
+        });
+    }
+
+    function renameHistory(idx) {
+        const h = state.history[idx];
+        const currentName = h.name || h.date;
+        const newName = prompt("履歴の名前を変更してください", currentName);
+        if (newName !== null && newName.trim() !== "") {
+            h.name = newName.trim();
+            saveState();
+            renderHistory();
+        }
+    }
+
+    function loadHistory(idx) {
+        if(!confirm("現在の配置と各種設定（名簿・ルール・配慮など）を、保存当時のもので上書きして復元しますか？")) return;
+        const h = state.history[idx];
+        
+        // 配置の復元
+        state.seatLayout = h.layout || {};
+        state.seatGroups = h.groups || {}; // Fallback for old history
+        state.fixedSeats = h.fixedSeats || {};
+        state.shuffledSeats = h.seats || {};
+        state.cols = h.cols || 6;
+        state.rows = h.rows || 5;
+
+        // 設定の復元（古いデータで保存されていない場合は何もしない）
+        if (h.boys) state.boys = [...h.boys];
+        if (h.girls) state.girls = [...h.girls];
+        if (h.badPairs) state.badPairs = [...h.badPairs];
+        if (h.goodPairs) state.goodPairs = [...h.goodPairs];
+        if (h.visionFront) state.visionFront = [...h.visionFront];
+        if (h.visionNear) state.visionNear = [...h.visionNear];
+        if (h.visionNearRows !== undefined) state.visionNearRows = h.visionNearRows;
+        if (h.leaders) state.leaders = [...h.leaders];
+        if (h.useLeaders !== undefined) state.useLeaders = h.useLeaders;
+
+        updateUIInputs(); // 復元した設定を画面のテキストエリア等にも反映
+        renderGrid(true);
+        closeSettings();
+        showToast(`「${h.name || h.date}」を復元しました`);
+    }
+    
+    function deleteHistory(idx) {
+        if(!confirm("削除しますか？")) return;
+        state.history.splice(idx, 1);
+        saveState();
+        renderHistory();
+    }
+
+    // --- Misc Features ---
+    function saveImage() {
+        if(confirm("印刷プレビューを開きます。\nPDFとして保存したり、プリンターで印刷できます。")) {
+            window.print();
+        }
+    }
+
+    // --- Settings UI Helpers ---
+    function switchTab(t, btn) {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        document.getElementById('tab-'+t).classList.add('active');
+        if(t==='layout') {
+            currentLayoutMode = 'type'; // Reset to default when opening tab
+            document.querySelector('input[value="type"]').checked = true;
+            changeLayoutMode();
+            updatePreview();
+        }
+    }
+    
+    function changeLayoutMode() {
+        const mode = document.querySelector('input[name="layoutMode"]:checked').value;
+        currentLayoutMode = mode;
+        if (mode === 'type') {
+            document.getElementById('typeTools').style.display = 'flex';
+            document.getElementById('groupTools').style.display = 'none';
+            document.getElementById('fixedTools').style.display = 'none';
+        } else if (mode === 'group') {
+            document.getElementById('typeTools').style.display = 'none';
+            document.getElementById('groupTools').style.display = 'flex';
+            document.getElementById('fixedTools').style.display = 'none';
+        } else if (mode === 'fixed') {
+            document.getElementById('typeTools').style.display = 'none';
+            document.getElementById('groupTools').style.display = 'none';
+            document.getElementById('fixedTools').style.display = 'flex';
+        }
+    }
+
+    function setGroupTool(num, btn) {
+        currentGroupTool = num;
+        document.querySelectorAll('.group-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+    }
+
+    function resetSeats() { if(confirm('リセットしますか？')) { state.shuffledSeats={}; renderGrid(true); } }
+    function openSettings() { document.getElementById('settingsModal').classList.add('active'); updateUIInputs(); }
+    function closeSettings() { document.getElementById('settingsModal').classList.remove('active'); }
+    function saveAndCloseSettings() { saveState(); renderGrid(false); closeSettings(); }
+    
+    // Layout Tools
+    function setTool(t, btn) { currentTool=t; document.querySelectorAll('.tool-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); }
+    function resizeGrid() {
+        state.cols = parseInt(document.getElementById('colInput').value);
+        state.rows = parseInt(document.getElementById('rowInput').value);
+        updatePreview();
+    }
+    
+    function updatePreview() {
+        const pGrid = document.getElementById('previewGrid');
+        pGrid.style.gridTemplateColumns = `repeat(${state.cols}, 1fr)`;
+        pGrid.innerHTML = '';
+        for(let r=0; r<state.rows; r++) for(let c=0; c<state.cols; c++) {
+            const k = `${r}-${c}`;
+            const div = document.createElement('div');
+            const type = state.seatLayout[k] || ((r+c)%2===0?'boy':'girl');
+            div.className = `preview-seat ${type}`;
+            div.style.position = 'relative';
+            
+            // Draw Group Badge in Preview
+            const groupNum = state.seatGroups ? state.seatGroups[k] : null;
+            if (groupNum) {
+                const badge = document.createElement('div');
+                badge.className = 'preview-group-badge';
+                badge.textContent = groupNum;
+                div.appendChild(badge);
+            }
+
+            // Draw Fixed Seat in Preview
+            const fixedName = state.fixedSeats ? state.fixedSeats[k] : null;
+            if (fixedName) {
+                const fixedBadge = document.createElement('div');
+                fixedBadge.style.position = 'absolute';
+                fixedBadge.style.top = '50%';
+                fixedBadge.style.left = '50%';
+                fixedBadge.style.transform = 'translate(-50%, -50%)';
+                fixedBadge.style.fontSize = '0.5rem';
+                fixedBadge.style.color = '#000';
+                fixedBadge.style.background = 'rgba(255,255,255,0.8)';
+                fixedBadge.style.padding = '1px 2px';
+                fixedBadge.style.borderRadius = '3px';
+                fixedBadge.style.whiteSpace = 'nowrap';
+                fixedBadge.style.pointerEvents = 'none';
+                fixedBadge.style.zIndex = '3';
+                fixedBadge.textContent = '📌' + (fixedName.length > 2 ? fixedName.substring(0,2)+'..' : fixedName);
+                div.appendChild(fixedBadge);
+            }
+
+            div.onclick = () => { 
+                if (currentLayoutMode === 'type') {
+                    state.seatLayout[k] = currentTool; 
+                } else if (currentLayoutMode === 'group') {
+                    if (!state.seatGroups) state.seatGroups = {};
+                    if (currentGroupTool === 0) {
+                        delete state.seatGroups[k];
+                    } else {
+                        state.seatGroups[k] = currentGroupTool;
+                    }
+                } else if (currentLayoutMode === 'fixed') {
+                    if (!state.fixedSeats) state.fixedSeats = {};
+                    const currentName = state.fixedSeats[k] || '';
+                    const name = prompt('この席に固定する人の名前を入力してください（空欄で解除）:\n※名簿と同じ名前にしてください', currentName);
+                    if (name !== null) {
+                        if (name.trim() === '') {
+                            delete state.fixedSeats[k];
+                        } else {
+                            state.fixedSeats[k] = name.trim();
+                        }
+                    }
+                }
+                updatePreview(); 
+            };
+            pGrid.appendChild(div);
+        }
+    }
+    function resetLayoutPattern(force) {
+        if(!force && !confirm("リセットしますか？")) return;
+        state.seatLayout = {};
+        state.seatGroups = {}; // Reset groups too
+        state.fixedSeats = {}; // Reset fixed seats
+        updatePreview();
+    }
+</script>
+</body>
+</html>
